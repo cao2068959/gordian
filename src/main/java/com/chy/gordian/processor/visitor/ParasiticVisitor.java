@@ -4,6 +4,7 @@ package com.chy.gordian.processor.visitor;
 import com.chy.gordian.annotation.Parasitic;
 import com.chy.gordian.common.JCTool;
 import com.sun.tools.javac.code.Flags;
+import com.sun.tools.javac.code.Symbol;
 import com.sun.tools.javac.code.TypeTag;
 import com.sun.tools.javac.model.JavacElements;
 import com.sun.tools.javac.tree.JCTree;
@@ -11,6 +12,7 @@ import com.sun.tools.javac.tree.TreeMaker;
 import com.sun.tools.javac.tree.TreeTranslator;
 import com.sun.tools.javac.util.List;
 import com.sun.tools.javac.util.ListBuffer;
+import com.sun.tools.javac.util.Name;
 
 import java.util.ArrayList;
 
@@ -32,13 +34,14 @@ public class ParasiticVisitor extends TreeTranslator {
 
     @Override
     public void visitMethodDef(JCTree.JCMethodDecl jcMethodDecl) {
+        treeMaker.pos = jcMethodDecl.pos;
+
         int len = gordianNames.size();
         for (String gordianName : gordianNames) {
             boolean last = false;
             if (len - 1 == index) {
                 last = true;
             }
-
             doTamperMethod(jcMethodDecl, gordianName, last);
             index++;
         }
@@ -132,14 +135,36 @@ public class ParasiticVisitor extends TreeTranslator {
 
         //强转成 RuntimeException 类型 兜底策略
         JCTree.JCTypeCast jcTypeCastRuntimeException = treeMaker.TypeCast(JCTool.memberAccess(treeMaker, elementUtils, "java.lang.RuntimeException"),
-                treeMaker.Ident(elementUtils.getName("e")));
+                treeMaker.Ident(elementUtils.getName("$ex")));
         //抛出 RuntimeException 类型的异常
         catchBody.add(treeMaker.Throw(jcTypeCastRuntimeException));
 
 
-        JCTree.JCCatch aCatch = treeMaker.Catch(createVar("e", "java.lang.Throwable", null), treeMaker.Block(0, catchBody.toList()));
+        //JCTree.JCExpression varType = JCTool.memberAccess(treeMaker, elementUtils, "java.lang.Throwable");
+        JCTree.JCExpression varType = chainDots(-1, null, null, "java.lang.Throwable".split("\\."));
+
+        Name $ex = elementUtils.getName("$ex");
+        JCTree.JCVariableDecl jcVariableDecl = treeMaker.VarDef(treeMaker.Modifiers(Flags.FINAL | Flags.PARAMETER), $ex, varType, null);
+
+        JCTree.JCCatch aCatch = treeMaker.Catch(jcVariableDecl, treeMaker.Block(0, catchBody.toList()));
         JCTree.JCTry result = treeMaker.Try(treeMaker.Block(0, tryBlockList), List.of(aCatch), null);
         return result;
+    }
+
+
+    public  JCTree.JCExpression chainDots( int pos, String elem1, String elem2, String... elems) {
+        assert elems != null;
+        if (pos != -1) treeMaker = treeMaker.at(pos);
+        JCTree.JCExpression e = null;
+        if (elem1 != null) e = treeMaker.Ident(elementUtils.getName(elem1));
+        if (elem2 != null) e = e == null ? treeMaker.Ident(elementUtils.getName(elem2)) : treeMaker.Select(e, elementUtils.getName(elem2));
+        for (int i = 0 ; i < elems.length ; i++) {
+            e = e == null ? treeMaker.Ident(elementUtils.getName(elems[i])) : treeMaker.Select(e, elementUtils.getName(elems[i]));
+        }
+
+        assert e != null;
+
+        return e;
     }
 
 

@@ -2,6 +2,7 @@ package com.chy.gordian.processor;
 
 
 import com.chy.gordian.annotation.Parasitic;
+import com.chy.gordian.processor.visitor.CatchVisitor;
 import com.chy.gordian.processor.visitor.ParasiticVisitor;
 import com.sun.source.util.TreePath;
 import com.sun.source.util.Trees;
@@ -25,7 +26,7 @@ import java.util.ArrayList;
 import java.util.Set;
 
 @SupportedAnnotationTypes("com.chy.gordian.annotation.Parasitic")
-@SupportedSourceVersion(SourceVersion.RELEASE_8)
+@SupportedSourceVersion(SourceVersion.RELEASE_11)
 public class ParasiticProcessor extends AbstractProcessor {
 
     JavacElements elementUtils;
@@ -51,6 +52,7 @@ public class ParasiticProcessor extends AbstractProcessor {
             Parasitic parasiticAnnotation = element.getAnnotation(Parasitic.class);
             JCTree tree = elementUtils.getTree(element);
             tree.accept(new ParasiticVisitor(treeMaker, elementUtils, gordianNames, parasiticAnnotation));
+            tree.accept(new CatchVisitor());
         }
         return true;
     }
